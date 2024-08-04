@@ -38,7 +38,7 @@ ResqAI is a tool that provides weather forecasts, earthquake data, disaster anal
 1. **Clone the Repository**
 
 ```bash
-git clone https://github.com/your_username/resqai.git
+git clone https://github.com/rsharvesh16/ResqAI.git
 cd resqai
 ```
 
