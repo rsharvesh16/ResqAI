@@ -1,0 +1,14 @@
+requests
+streamlit
+awscli
+boto3
+python-dotenv
+langchain
+pypdf
+faiss-cpu
+langchain_community
+plotly
+geopy
+folium
+streamlit-folium
+google-api-python-client
