@@ -1,5 +1,9 @@
 # ResqAI - Your Emergency Companion
 
+<div align="center">
+<img width="446" alt="image" src="49838578-bff1b52554e88a8700550da8ca5257d4.png">
+</div>
+
 ## Overview
 
 ResqAI is a tool that provides weather forecasts, earthquake data, disaster analysis, emergency response plans, and the latest weather and earthquake news. It uses advanced AI models and LLMs to help you stay prepared for emergencies.
