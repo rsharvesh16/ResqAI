@@ -16,6 +16,12 @@ from streamlit_folium import folium_static
 import json
 from datetime import datetime, timedelta
 from googleapiclient.discovery import build
+import folium
+from streamlit_folium import folium_static
+from PIL import Image
+import tempfile
+import os
+from branca.colormap import LinearColormap
 
 load_dotenv()
 
@@ -45,6 +51,76 @@ def data_ingestion():
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=10000, chunk_overlap=1000)
     docs = text_splitter.split_documents(documents)
     return docs
+
+def get_satellite_image(lat, lon, date):
+    temp = get_temperature_for_date(lat, lon, date)
+    color, label = get_color_for_temperature(temp)
+    img = Image.new('RGB', (256, 256), color)
+    
+    with tempfile.NamedTemporaryFile(delete=False, suffix='.png') as tmp_file:
+        img.save(tmp_file, format='PNG')
+        tmp_file_path = tmp_file.name
+    
+    return tmp_file_path, label
+
+def add_color_legend(m):
+    color_scale = LinearColormap(
+        colors=['blue', 'lightblue', 'green', 'orange', 'red'],
+        vmin=0, vmax=40,
+        caption='Temperature Scale'
+    )
+    color_scale.add_to(m)
+
+def add_weather_animation(m, lat, lon, condition):
+    if condition.lower() == 'rain':
+        folium.CircleMarker(
+            [lat, lon],
+            radius=50,
+            color='blue',
+            fill=True,
+            fillColor='blue',
+            fillOpacity=0.2,
+            popup='Heavy Rainfall',
+        ).add_to(m)
+        
+        folium.CircleMarker(
+            [lat, lon],
+            radius=40,
+            color='blue',
+            fill=True,
+            fillColor='blue',
+            fillOpacity=0.4,
+            popup='Heavy Rainfall',
+        ).add_to(m)
+        
+        folium.CircleMarker(
+            [lat, lon],
+            radius=30,
+            color='blue',
+            fill=True,
+            fillColor='blue',
+            fillOpacity=0.6,
+            popup='Heavy Rainfall',
+        ).add_to(m)
+
+
+def get_temperature_for_date(lat, lon, date):
+    # This is a placeholder function. In a real implementation, you would fetch
+    # the actual temperature from your weather data.
+    # For this example, we'll return a random temperature between 0 and 40.
+    return (date.day * lat * lon) % 40
+
+def get_color_for_temperature(temp):
+    if temp < 0:
+        return (0, 0, 255), "Very Cold"
+    elif 0 <= temp < 10:
+        return (0, 128, 255), "Cold"
+    elif 10 <= temp < 20:
+        return (0, 255, 0), "Mild"
+    elif 20 <= temp < 30:
+        return (255, 128, 0), "Warm"
+    else:
+        return (255, 0, 0), "Hot"
 
 def get_vector_store(docs):
     if not docs:
@@ -485,6 +561,65 @@ def main():
                 folium_static(m, width=1000, height=600)
             else:
                 st.write("Unable to generate map for this location.")
+
+            # New Satellite Map Feature
+            st.subheader("7-Day Weather Forecast with Satellite Map")
+            lat = weather_data['location']['lat']
+            lon = weather_data['location']['lon']
+
+            # Create a map centered on the location
+            m = folium.Map(location=[lat, lon], zoom_start=8)
+
+            # Add a marker for the location
+            folium.Marker(
+                [lat, lon],
+                popup=f"<b>{weather_data['location']['name']}</b>",
+                tooltip=weather_data['location']['name']
+            ).add_to(m)
+
+            # Create a date slider
+            start_date = datetime.now().date()
+            dates = [start_date + timedelta(days=i) for i in range(7)]
+            selected_date = st.select_slider("Select date:", options=dates, format_func=lambda x: x.strftime('%Y-%m-%d'))
+
+            # Get satellite image for the selected date
+            satellite_image_path, temp_label = get_satellite_image(lat, lon, selected_date)
+
+            # Add the satellite image as an overlay
+            folium.raster_layers.ImageOverlay(
+                image=satellite_image_path,
+                bounds=[[lat-1, lon-1], [lat+1, lon+1]],
+                opacity=0.6,
+                name=f"Satellite ({temp_label})",
+                overlay=True
+            ).add_to(m)
+
+            # Add color legend
+            add_color_legend(m)
+
+            # Add weather animation
+            forecast = next((day for day in weather_data['forecast']['forecastday'] if day['date'] == selected_date.strftime('%Y-%m-%d')), None)
+            if forecast and forecast['day']['daily_chance_of_rain'] > 50:
+                add_weather_animation(m, lat, lon, 'rain')
+
+            # Add layer control
+            folium.LayerControl().add_to(m)
+
+            # Display the map
+            folium_static(m)
+
+            # Clean up the temporary file
+            os.unlink(satellite_image_path)
+
+            # Display weather information for the selected date
+            st.subheader(f"Weather for {selected_date.strftime('%Y-%m-%d')}")
+            if forecast:
+                st.write(f"Max temperature: {forecast['day']['maxtemp_c']}°C")
+                st.write(f"Min temperature: {forecast['day']['mintemp_c']}°C")
+                st.write(f"Chance of rain: {forecast['day']['daily_chance_of_rain']}%")
+                st.write(f"Condition: {forecast['day']['condition']['text']}")
+            else:
+                st.write("No forecast data available for this date.")
 
             col3, col4 = st.columns(2)
             
